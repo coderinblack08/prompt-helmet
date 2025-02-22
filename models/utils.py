@@ -15,8 +15,11 @@ def get_all_user_prompts(system_prompt_id):
     return user_prompts[user_prompts["system_prompt_id"] == system_prompt_id]
 
 
-def get_training_and_validation_splits(split_ratio=0.8):
+def get_training_and_validation_splits(split_ratio=0.8, total_size=None):
     _, system_prompts = pull_datasets()
+    
+    if total_size is not None:
+        system_prompts = system_prompts.sample(n=min(total_size, len(system_prompts)), random_state=42)
     
     train_system_prompts = system_prompts.sample(frac=split_ratio, random_state=42)
     val_system_prompts = system_prompts[~system_prompts.index.isin(train_system_prompts.index)]
