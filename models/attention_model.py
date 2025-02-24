@@ -6,7 +6,9 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import torch.optim as optim
-from .classifiers import CNNTransformerClassifier
+from .classifiers import SimpleCNNClassifier, RandomForestClassifier, GradientBoostingClassifier
+from .utils import get_training_and_validation_splits
+import time
 
 
 class AttentionHeatmapDataset(Dataset):
@@ -22,20 +24,82 @@ class AttentionHeatmapDataset(Dataset):
 
 
 class AttentionModel:
-    def __init__(self, model_name, device="mps", classifier_class=CNNTransformerClassifier):
-        torch.set_default_device(device)
+    def __init__(self, model_name, device="mps", classifier_class=SimpleCNNClassifier, total_size=None, batch_size=32, load_model=False):
         self.model_name = model_name
         self.device = device
+        self.total_size = total_size
+        
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             attn_implementation="eager",
             torch_dtype="auto",
             device_map="auto"
-        )
+        ).to(device)
         self.classifier_class = classifier_class
         self.classifier = None
 
+        print("Loaded models")
+
+        self.train_dataset_path = f"datasets/train_attention_dataset_{total_size}.pt"
+        self.val_dataset_path = f"datasets/val_attention_dataset_{total_size}.pt"
+        self.classifier_path = f"saved_models/attention_classifier_{total_size}.pt"
+        
+        if load_model and self._saved_files_exist():
+            print("Loading saved datasets and model...")
+            train_dataset = torch.load(self.train_dataset_path)
+            val_dataset = torch.load(self.val_dataset_path)
+            
+            g = torch.Generator(device='cpu')
+            self.train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, generator=g)
+            self.val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, generator=g)
+            
+            sample_heatmap = next(iter(self.train_dataloader))[0][0]
+            input_shape = sample_heatmap.shape
+            self.classifier = self.classifier_class(input_shape).to(device)
+            self.classifier.load_state_dict(torch.load(self.classifier_path))
+            self.classifier.eval()
+            
+        else:
+            print("Preparing new datasets and model...")
+            (self.train_system_prompts, self.train_user_prompts), (self.val_system_prompts, self.val_user_prompts) = get_training_and_validation_splits(total_size=total_size)
+            
+            self.train_dataloader = self._prepare_dataloader(self.train_system_prompts, self.train_user_prompts, batch_size)
+            self.val_dataloader = self._prepare_dataloader(self.val_system_prompts, self.val_user_prompts, batch_size)
+
+            torch.save(self.train_dataloader.dataset, self.train_dataset_path)
+            torch.save(self.val_dataloader.dataset, self.val_dataset_path)
+            
+            sample_heatmap = next(iter(self.train_dataloader))[0][0]
+            input_shape = sample_heatmap.shape
+            self.classifier = self.classifier_class(input_shape).to(device)
+
+    def _saved_files_exist(self):
+        """Check if all necessary saved files exist."""
+        import os
+        return (os.path.exists(self.train_dataset_path) and 
+                os.path.exists(self.val_dataset_path) and 
+                os.path.exists(self.classifier_path))
+
+    def _prepare_dataloader(self, system_prompts, user_prompts, batch_size=32):
+        heatmaps = []
+        labels = []
+        
+        for idx, (sys_prompt, user_prompt) in enumerate(zip(system_prompts["system_prompt"], user_prompts["user_input"])):
+            _, _, attention_maps, _, data_range, _ = self.inference(
+                instruction=sys_prompt,
+                data=user_prompt
+            )
+            
+            heatmap = self.process_attn(attention_maps[0], data_range, "sum")
+            heatmaps.append(heatmap)
+            
+            labels.append(1 if user_prompts["is_injection"][idx] else 0)
+            print(f"Processed {idx} out of {len(system_prompts)}")
+        
+        dataset = AttentionHeatmapDataset(heatmaps, labels)
+        g = torch.Generator(device='cpu')
+        return DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=g)
 
     def get_last_attn(self, attn_map):
         for i, layer in enumerate(attn_map):
@@ -56,7 +120,7 @@ class AttentionModel:
         return logits.argmax(dim=-1).squeeze()
 
 
-    def inference(self, instruction, data, max_output_tokens=None):
+    def inference(self, instruction, data, max_output_tokens=1):
         messages = [
             {"role": "system", "content": instruction},
             {"role": "user", "content": "Data: " + data}
@@ -92,11 +156,7 @@ class AttentionModel:
         input_ids = model_inputs.input_ids
         attention_mask = model_inputs.attention_mask
         attention_maps = []
-
-        if max_output_tokens is None:
-            n_tokens = 100
-        else:
-            n_tokens = max_output_tokens
+        n_tokens = max_output_tokens
 
         with torch.no_grad():
             for i in range(n_tokens):
@@ -168,46 +228,26 @@ class AttentionModel:
     def calc_attn_score(self, heatmap):
         return np.sum(heatmap)
 
-
-    def prepare_training_data(self, system_prompts, user_prompts, batch_size=32):
-        heatmaps = []
-        labels = []
-        
-        for sys_prompt, user_prompt in zip(system_prompts, user_prompts):
-            # Generate attention maps through inference
-            _, _, attention_maps, _, data_range, _ = self.inference(
-                instruction=sys_prompt,
-                data=user_prompt
-            )
-            
-            # Process attention maps to create heatmap
-            heatmap = self.process_attn(attention_maps[0], data_range, "sum")
-            heatmaps.append(heatmap)
-            
-            # Assuming user_prompts has an 'is_injection' column
-            labels.append(1 if user_prompt.is_injection else 0)
-        
-        # Create dataset and dataloader
-        dataset = AttentionHeatmapDataset(heatmaps, labels)
-        return DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-    def train(self, train_dataloader, val_dataloader=None, epochs=10, learning_rate=1e-4, classifier_kwargs=None):
+    def train(self, epochs=10, learning_rate=1e-4, classifier_kwargs=None):
+        """Train the classifier model on the prepared datasets."""
+        # Determine which training method to use based on classifier type
+        if isinstance(self.classifier, SimpleCNNClassifier):
+            return self._train_cnn(epochs, learning_rate)
+        elif isinstance(self.classifier, RandomForestClassifier):
+            return self._train_random_forest()
+        elif isinstance(self.classifier, GradientBoostingClassifier):
+            return self._train_gradient_boosting()
+        else:
+            raise ValueError(f"Unsupported classifier type: {type(self.classifier).__name__}")
+    
+    def _train_cnn(self, epochs=10, learning_rate=1e-4):
+        """Train a CNN-based classifier."""
         device = torch.device(self.device)
-        
-        # Initialize classifier if not already initialized
-        if self.classifier is None:
-            sample_heatmap = next(iter(train_dataloader))[0][0]
-            input_shape = sample_heatmap.shape
-            classifier_kwargs = classifier_kwargs or {}
-            self.classifier = self.classifier_class(input_shape, **classifier_kwargs).to(device)
-
-        # Setup training
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.AdamW(self.classifier.parameters(), lr=learning_rate)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
         
         best_f1 = 0
-        save_path = f'best_{self.classifier.get_name()}_classifier.pt'
         
         for epoch in range(epochs):
             self.classifier.train()
@@ -215,7 +255,7 @@ class AttentionModel:
             all_preds = []
             all_labels = []
             
-            for heatmaps, labels in train_dataloader:
+            for heatmaps, labels in self.train_dataloader:
                 heatmaps, labels = heatmaps.to(device), labels.to(device)
                 
                 optimizer.zero_grad()
@@ -231,29 +271,74 @@ class AttentionModel:
                 all_preds.extend(preds)
                 all_labels.extend(labels.cpu().numpy())
             
-            # Calculate training metrics
             train_acc = accuracy_score(all_labels, all_preds)
             train_f1 = f1_score(all_labels, all_preds)
             
             print(f"Epoch {epoch+1}/{epochs}")
-            print(f"Training Loss: {total_loss/len(train_dataloader):.4f}")
+            print(f"Training Loss: {total_loss/len(self.train_dataloader):.4f}")
             print(f"Training Accuracy: {train_acc:.4f}")
             print(f"Training F1: {train_f1:.4f}")
             
-            # Validation
-            if val_dataloader:
-                val_metrics = self.evaluate(val_dataloader)
-                print(f"Validation Metrics: {val_metrics}")
-                
-                # Learning rate scheduling based on F1 score
-                scheduler.step(val_metrics['f1'])
-                
-                # Save best model
-                if val_metrics['f1'] > best_f1:
-                    best_f1 = val_metrics['f1']
-                    torch.save(self.classifier.state_dict(), save_path)
+            val_metrics = self.evaluate()
+            print(f"Validation Metrics: {val_metrics}")
+            
+            scheduler.step(val_metrics['f1'])
+            
+            if val_metrics['f1'] > best_f1:
+                best_f1 = val_metrics['f1']
+                torch.save(self.classifier.state_dict(), self.classifier_path)
+        
+        return val_metrics
+    
+    def _train_random_forest(self):
+        """Train a Random Forest classifier."""
+        return self._train_sklearn_model("Random Forest")
+    
+    def _train_gradient_boosting(self):
+        """Train a Gradient Boosting classifier."""
+        return self._train_sklearn_model("Gradient Boosting")
+    
+    def _train_sklearn_model(self, model_name):
+        """Generic training function for sklearn-based models."""
+        device = torch.device(self.device)
+        print(f"Training {model_name} classifier...")
+        
+        # Collect all training data
+        all_train_heatmaps = []
+        all_train_labels = []
+        
+        for heatmaps, labels in self.train_dataloader:
+            all_train_heatmaps.append(heatmaps)
+            all_train_labels.append(labels)
+        
+        # Concatenate all batches
+        train_heatmaps = torch.cat(all_train_heatmaps, dim=0)
+        train_labels = torch.cat(all_train_labels, dim=0)
+        
+        # Train the model
+        self.classifier.fit(train_heatmaps, train_labels)
+        
+        # Evaluate on training set
+        train_outputs = self.classifier(train_heatmaps)
+        train_preds = torch.argmax(train_outputs, dim=1).cpu().numpy()
+        train_labels = train_labels.numpy()
+        
+        train_acc = accuracy_score(train_labels, train_preds)
+        train_f1 = f1_score(train_labels, train_preds)
+        
+        print(f"Training Accuracy: {train_acc:.4f}")
+        print(f"Training F1: {train_f1:.4f}")
+        
+        # Evaluate on validation set
+        val_metrics = self.evaluate()
+        print(f"Validation Metrics: {val_metrics}")
+        
+        # Save the model
+        torch.save(self.classifier.state_dict(), self.classifier_path)
+        
+        return val_metrics
 
-    def evaluate(self, dataloader):
+    def evaluate(self):
         if self.classifier is None:
             raise ValueError("Classifier not initialized. Please train the model first.")
             
@@ -262,21 +347,38 @@ class AttentionModel:
         
         all_preds = []
         all_labels = []
+        all_times = []
         
         with torch.no_grad():
-            for heatmaps, labels in dataloader:
-                heatmaps = heatmaps.to(device)
-                outputs = self.classifier(heatmaps)
-                preds = torch.argmax(outputs, dim=1).cpu().numpy()
-                
-                all_preds.extend(preds)
-                all_labels.extend(labels.numpy())
+            for heatmaps, labels in self.val_dataloader:
+                # Process each sample in the batch individually to measure per-prompt time
+                for i in range(len(heatmaps)):
+                    single_heatmap = heatmaps[i:i+1].to(device)
+                    
+                    # Measure classification time
+                    start_time = time.time()
+                    outputs = self.classifier(single_heatmap)
+                    end_time = time.time()
+                    
+                    # Calculate time in milliseconds
+                    inference_time_ms = (end_time - start_time) * 1000
+                    all_times.append(inference_time_ms)
+                    
+                    pred = torch.argmax(outputs, dim=1).cpu().numpy()[0]
+                    all_preds.append(pred)
+                    all_labels.append(labels[i].item())
+        
+        # Calculate average time per prompt
+        avg_time_per_prompt_ms = sum(all_times) / len(all_times)
         
         return {
             'accuracy': accuracy_score(all_labels, all_preds),
             'precision': precision_score(all_labels, all_preds),
             'recall': recall_score(all_labels, all_preds),
-            'f1': f1_score(all_labels, all_preds)
+            'f1': f1_score(all_labels, all_preds),
+            'avg_time_per_prompt_ms': avg_time_per_prompt_ms,
+            'min_time_per_prompt_ms': min(all_times),
+            'max_time_per_prompt_ms': max(all_times)
         }
 
     def predict(self, heatmap):
@@ -288,11 +390,19 @@ class AttentionModel:
         
         with torch.no_grad():
             heatmap_tensor = torch.FloatTensor(heatmap).unsqueeze(0).to(device)
+            
+            # Measure classification time
+            start_time = time.time()
             output = self.classifier(heatmap_tensor)
+            end_time = time.time()
+            
             pred = torch.argmax(output, dim=1).item()
             prob = F.softmax(output, dim=1)[0][pred].item()
+            
+            # Calculate time in milliseconds
+            inference_time_ms = (end_time - start_time) * 1000
         
-        return pred, prob
+        return pred, prob, inference_time_ms
 
     def load_classifier(self, state_dict_path):
         """Load a trained classifier from a state dict file."""

@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from setfit import SetFitModel, TrainingArguments, Trainer
 import torch
 import numpy as np
+import time
 
 
 class ContrastivePromptEmbeddingTrainer:
@@ -97,7 +98,27 @@ class ContrastivePromptEmbeddingTrainer:
             system_embeddings.append(system_prompt_dict[prompt])
 
         system_embeddings = torch.stack(system_embeddings)
-        user_embeddings = torch.from_numpy(self.model.encode(self.val_user_prompts["user_input"].tolist()))
+        
+        # Measure time for each user prompt embedding and classification
+        user_prompts = self.val_user_prompts["user_input"].tolist()
+        user_embeddings = []
+        classification_times_ms = []
+        
+        for user_prompt in user_prompts:
+            # Measure time for embedding and classification
+            start_time = time.time()
+            
+            # Encode the user prompt
+            user_embedding = torch.from_numpy(self.model.encode(user_prompt))
+            
+            # Calculate similarity with corresponding system prompt
+            # (This simulates the classification process)
+            user_embeddings.append(user_embedding)
+            
+            end_time = time.time()
+            classification_times_ms.append((end_time - start_time) * 1000)
+        
+        user_embeddings = torch.stack(user_embeddings)
         
         system_embeddings = system_embeddings.cpu().numpy()
         user_embeddings = user_embeddings.cpu().numpy()
@@ -117,6 +138,9 @@ class ContrastivePromptEmbeddingTrainer:
             "precision": precision,
             "recall": recall,
             "f1": f1,
+            "avg_time_per_prompt_ms": sum(classification_times_ms) / len(classification_times_ms),
+            "min_time_per_prompt_ms": min(classification_times_ms),
+            "max_time_per_prompt_ms": max(classification_times_ms)
         }
         
         return results
@@ -173,9 +197,31 @@ class SetFitPromptEmbeddingTrainer:
     def evaluate(self, threshold=0.5):
         if self.trainer is None and not self.pretrained:
             raise ValueError("Model must be trained before evaluation")
+        
+        # Measure time for each prompt classification
+        system_prompts = self.val_system_prompts["system_prompt"].tolist()
+        user_prompts = self.val_user_prompts["user_input"].tolist()
+        classification_times_ms = []
+        
+        # First encode all system prompts
+        system_embeddings = []
+        for system_prompt in system_prompts:
+            system_embeddings.append(self.model.encode([system_prompt])[0])
+        
+        # Then measure time for each user prompt encoding and classification
+        user_embeddings = []
+        for user_prompt in user_prompts:
+            start_time = time.time()
             
-        system_embeddings = self.model.encode(self.val_system_prompts["system_prompt"].tolist())
-        user_embeddings = self.model.encode(self.val_user_prompts["user_input"].tolist())
+            # Encode the user prompt
+            user_embedding = self.model.encode([user_prompt])[0]
+            user_embeddings.append(user_embedding)
+            
+            end_time = time.time()
+            classification_times_ms.append((end_time - start_time) * 1000)
+        
+        system_embeddings = np.array(system_embeddings)
+        user_embeddings = np.array(user_embeddings)
         
         similarities = cosine_similarity(system_embeddings, user_embeddings)
         predictions = (similarities.diagonal() > threshold).astype(int)
@@ -192,6 +238,9 @@ class SetFitPromptEmbeddingTrainer:
             "precision": precision,
             "recall": recall,
             "f1": f1,
+            "avg_time_per_prompt_ms": sum(classification_times_ms) / len(classification_times_ms),
+            "min_time_per_prompt_ms": min(classification_times_ms),
+            "max_time_per_prompt_ms": max(classification_times_ms)
         }
         
         return results
