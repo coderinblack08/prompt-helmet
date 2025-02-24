@@ -1,12 +1,12 @@
-# Prompt Helmet
+# 🪖 Prompt Helmet
 
 > SOTA anomaly-detection algorithm to defend against prompt injection attacks.
 
 ## References
 
-https://shekhargulati.com/2024/08/11/building-a-bulletproof-prompt-injection-detector-using-setfit-with-just-32-examples/
+- https://shekhargulati.com/2024/08/11/building-a-bulletproof-prompt-injection-detector-using-setfit-with-just-32-examples/
 
-https://arxiv.org/abs/2402.11755
+- https://arxiv.org/abs/2402.11755
 
 ## Abstract
 
@@ -16,20 +16,32 @@ Large language models (LLMs) are transforming industries with flexible, non-dete
 
 Embedding model:
 
-- Try different base models
+- Try different base models:
 
-- Measure the time per inference
+  - [ ] all-MiniLM-L6-v2 (22.7M)
+  - [ ] all-mpnet-base-v2 (109M)
+
+- [ ] Measure the time per inference (ms)
 
 Attention model:
 
-- Try different classifier models
+- Try different classifier models:
 
-- Try different base LLMs
+  - [ ] Gradient Boosting
+  - [ ] Random Forest
+  - [ ] CNN
 
-- Measure the time per inference
+- Try different base LLMs:
+
+  - [ ] Qwen (1.5B)
+  - [ ] Gemma (2B)
+  - [ ] Mistral (7B)
+  - [ ] Llama (8B)
+
+- [ ] Measure the time per inference (ms)
 
 Embedding + Attention model:
 
-- Choose the best embedding model and best attention model
+- [ ] Choose the best embedding model and best attention model
 
-- Measure the time per inference
+- [ ] Measure the time per inference (ms)
