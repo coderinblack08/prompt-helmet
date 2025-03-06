@@ -4,6 +4,8 @@
 
 ## References
 
+- What is prompt injection? [Watch Computerphile](https://www.youtube.com/watch?v=rAEqP9VEhe8) to learn why NIST calls it Gen AI's greatest flaw.
+
 - https://shekhargulati.com/2024/08/11/building-a-bulletproof-prompt-injection-detector-using-setfit-with-just-32-examples/
 
 - https://arxiv.org/abs/2402.11755
@@ -18,10 +20,10 @@ Embedding model:
 
 - Try different base models:
 
-  - [ ] all-MiniLM-L6-v2 (22.7M)
-  - [ ] all-mpnet-base-v2 (109M)
+  - [x] all-MiniLM-L6-v2 (22.7M)
+  - [x] all-mpnet-base-v2 (109M)
 
-- [ ] Measure the time per inference (ms)
+- [x] Measure the time per inference (ms)
 
 Attention model:
 

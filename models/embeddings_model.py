@@ -2,25 +2,26 @@ from sentence_transformers import SentenceTransformer, SentenceTransformerTraine
 from datasets import Dataset
 from .utils import get_training_and_validation_splits
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from setfit import SetFitModel, TrainingArguments, Trainer
 import torch
 import numpy as np
 import time
+import pandas as pd
 
 
 class ContrastivePromptEmbeddingTrainer:
     def __init__(self, model_name, total_size=None, load_model=False):
         self.device = "mps" if torch.backends.mps.is_available() else "cpu"
+        self.model_name = model_name
         if load_model:
             self.pretrained = True
-            self.model = SentenceTransformer("./saved_models/embeddings_model.bin").to(self.device)
+            self.model = SentenceTransformer(f"./saved_models/embeddings_model_{model_name}.bin").to(self.device)
         else:
             self.pretrained = False
             self.model = SentenceTransformer(model_name).to(self.device)
         self.trainer = None
         
-        # Prepare train and validation datasets during initialization
         (self.train_system_prompts, self.train_user_prompts), (self.val_system_prompts, self.val_user_prompts) = get_training_and_validation_splits(total_size=total_size)
         self.train_dataset = self.prepare_dataset(self.train_system_prompts, self.train_user_prompts)
         self.val_dataset = self.prepare_dataset(self.val_system_prompts, self.val_user_prompts)
@@ -29,6 +30,10 @@ class ContrastivePromptEmbeddingTrainer:
         system_prompts_list = system_prompts_df["system_prompt"].tolist()
         user_prompts_list = user_prompts_df["user_input"].tolist()
         is_injected_list = user_prompts_df["is_injection"].tolist()
+        
+        system_prompts_list = [str(x) if not pd.isna(x) else "" for x in system_prompts_list]
+        user_prompts_list = [str(x) if not pd.isna(x) else "" for x in user_prompts_list]
+        is_injected_list = [int(x) if not pd.isna(x) else 0 for x in is_injected_list]
 
         return Dataset.from_dict({
             "sentence1": system_prompts_list,
@@ -45,7 +50,7 @@ class ContrastivePromptEmbeddingTrainer:
         )
         
         self.trainer.train()
-        self.model.save("./saved_models/embeddings_model.bin")
+        self.model.save(f"./saved_models/embeddings_model_{self.model_name}.bin")
         
     def find_optimal_threshold(self, threshold_range=None):
         if self.trainer is None and not self.pretrained:
@@ -99,20 +104,15 @@ class ContrastivePromptEmbeddingTrainer:
 
         system_embeddings = torch.stack(system_embeddings)
         
-        # Measure time for each user prompt embedding and classification
         user_prompts = self.val_user_prompts["user_input"].tolist()
         user_embeddings = []
         classification_times_ms = []
         
         for user_prompt in user_prompts:
-            # Measure time for embedding and classification
             start_time = time.time()
             
-            # Encode the user prompt
             user_embedding = torch.from_numpy(self.model.encode(user_prompt))
             
-            # Calculate similarity with corresponding system prompt
-            # (This simulates the classification process)
             user_embeddings.append(user_embedding)
             
             end_time = time.time()
@@ -126,10 +126,12 @@ class ContrastivePromptEmbeddingTrainer:
         similarities = cosine_similarity(system_embeddings, user_embeddings)
         predictions = (similarities.diagonal() > threshold).astype(int)
         
-        accuracy = accuracy_score(self.val_user_prompts["is_injection"].tolist(), predictions)
-        precision = precision_score(self.val_user_prompts["is_injection"].tolist(), predictions)
-        recall = recall_score(self.val_user_prompts["is_injection"].tolist(), predictions)
-        f1 = f1_score(self.val_user_prompts["is_injection"].tolist(), predictions)
+        true_labels = self.val_user_prompts["is_injection"].tolist()
+        accuracy = accuracy_score(true_labels, predictions)
+        precision = precision_score(true_labels, predictions)
+        recall = recall_score(true_labels, predictions)
+        f1 = f1_score(true_labels, predictions)
+        auc_roc = roc_auc_score(true_labels, similarities.diagonal())
         
         results = {
             "num_system_prompts": len(self.val_system_prompts),
@@ -138,6 +140,7 @@ class ContrastivePromptEmbeddingTrainer:
             "precision": precision,
             "recall": recall,
             "f1": f1,
+            "auc_roc": auc_roc,
             "avg_time_per_prompt_ms": sum(classification_times_ms) / len(classification_times_ms),
             "min_time_per_prompt_ms": min(classification_times_ms),
             "max_time_per_prompt_ms": max(classification_times_ms)
@@ -155,7 +158,6 @@ class SetFitPromptEmbeddingTrainer:
         self.model = SetFitModel.from_pretrained(model_name).to(self.device)
         self.trainer = None
         
-        # Prepare train and validation datasets during initialization
         (self.train_system_prompts, self.train_user_prompts), (self.val_system_prompts, self.val_user_prompts) = get_training_and_validation_splits(total_size=total_size)
         self.train_dataset = self.prepare_dataset(self.train_system_prompts, self.train_user_prompts)
         self.val_dataset = self.prepare_dataset(self.val_system_prompts, self.val_user_prompts)
@@ -164,6 +166,10 @@ class SetFitPromptEmbeddingTrainer:
         system_prompts_list = system_prompts_df["system_prompt"].tolist()
         user_prompts_list = user_prompts_df["user_input"].tolist()
         is_injected_list = user_prompts_df["is_injection"].tolist()
+        
+        system_prompts_list = [str(x) if not pd.isna(x) else "" for x in system_prompts_list]
+        user_prompts_list = [str(x) if not pd.isna(x) else "" for x in user_prompts_list]
+        is_injected_list = [int(x) if not pd.isna(x) else 0 for x in is_injected_list]
         
         text_pairs = [
             f"System: {system_prompt} \n User: {user_prompt}"
@@ -198,22 +204,18 @@ class SetFitPromptEmbeddingTrainer:
         if self.trainer is None and not self.pretrained:
             raise ValueError("Model must be trained before evaluation")
         
-        # Measure time for each prompt classification
         system_prompts = self.val_system_prompts["system_prompt"].tolist()
         user_prompts = self.val_user_prompts["user_input"].tolist()
         classification_times_ms = []
         
-        # First encode all system prompts
         system_embeddings = []
         for system_prompt in system_prompts:
             system_embeddings.append(self.model.encode([system_prompt])[0])
         
-        # Then measure time for each user prompt encoding and classification
         user_embeddings = []
         for user_prompt in user_prompts:
             start_time = time.time()
             
-            # Encode the user prompt
             user_embedding = self.model.encode([user_prompt])[0]
             user_embeddings.append(user_embedding)
             

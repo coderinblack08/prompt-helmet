@@ -4,11 +4,12 @@ import numpy as np
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 import torch.optim as optim
 from .classifiers import SimpleCNNClassifier, RandomForestClassifier, GradientBoostingClassifier
 from .utils import get_training_and_validation_splits
 import time
+import os
 
 
 class AttentionHeatmapDataset(Dataset):
@@ -24,26 +25,52 @@ class AttentionHeatmapDataset(Dataset):
 
 
 class AttentionModel:
-    def __init__(self, model_name, device="mps", classifier_class=SimpleCNNClassifier, total_size=None, batch_size=32, load_model=False):
+    def __init__(self, model_name, device="mps", classifier_class=SimpleCNNClassifier, total_size=None, batch_size=32, load_model=False, load_dataset=False):
         self.model_name = model_name
         self.device = device
         self.total_size = total_size
         
+        # Create safe model name for file paths
+        model_name_safe = model_name.replace('/', '_')
+        
+        # Define dataset and model paths
+        self.train_dataset_path = f"datasets/train_attention_dataset_{model_name_safe}.pt"
+        self.val_dataset_path = f"datasets/val_attention_dataset_{model_name_safe}.pt"
+        self.classifier_path = f"saved_models/attention_classifier_{model_name_safe}.pt"
+        
+        # Create directories if they don't exist
+        os.makedirs("datasets", exist_ok=True)
+        os.makedirs("saved_models", exist_ok=True)
+        
+        # Check if we only need to load datasets
+        if load_dataset and self._datasets_exist():
+            print("Loading saved datasets only...")
+            train_dataset = torch.load(self.train_dataset_path)
+            val_dataset = torch.load(self.val_dataset_path)
+            
+            g = torch.Generator(device='cpu')
+            self.train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, generator=g)
+            self.val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, generator=g)
+            
+            # Don't load the model or tokenizer
+            self.tokenizer = None
+            self.model = None
+            self.classifier = None
+            self.classifier_class = classifier_class
+            return
+        
+        # Load tokenizer and model if we need them
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             attn_implementation="eager",
-            torch_dtype="auto",
+            torch_dtype=torch.float16,
             device_map="auto"
         ).to(device)
         self.classifier_class = classifier_class
         self.classifier = None
 
         print("Loaded models")
-
-        self.train_dataset_path = f"datasets/train_attention_dataset_{total_size}.pt"
-        self.val_dataset_path = f"datasets/val_attention_dataset_{total_size}.pt"
-        self.classifier_path = f"saved_models/attention_classifier_{total_size}.pt"
         
         if load_model and self._saved_files_exist():
             print("Loading saved datasets and model...")
@@ -76,10 +103,14 @@ class AttentionModel:
 
     def _saved_files_exist(self):
         """Check if all necessary saved files exist."""
-        import os
         return (os.path.exists(self.train_dataset_path) and 
                 os.path.exists(self.val_dataset_path) and 
                 os.path.exists(self.classifier_path))
+                
+    def _datasets_exist(self):
+        """Check if dataset files exist."""
+        return (os.path.exists(self.train_dataset_path) and 
+                os.path.exists(self.val_dataset_path))
 
     def _prepare_dataloader(self, system_prompts, user_prompts, batch_size=32):
         heatmaps = []
@@ -96,8 +127,16 @@ class AttentionModel:
             
             labels.append(1 if user_prompts["is_injection"][idx] else 0)
             print(f"Processed {idx} out of {len(system_prompts)}")
+            
+            if idx % 10 == 0 and self.device == "mps":
+                torch.mps.empty_cache()
         
         dataset = AttentionHeatmapDataset(heatmaps, labels)
+        
+        dataset_path = f"datasets/attention_dataset_{len(heatmaps)}_{self.model_name.replace('/', '_')}.pt"
+        torch.save(dataset, dataset_path)
+        print(f"Dataset saved to {dataset_path}")
+        
         g = torch.Generator(device='cpu')
         return DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=g)
 
@@ -121,6 +160,9 @@ class AttentionModel:
 
 
     def inference(self, instruction, data, max_output_tokens=1):
+        if not isinstance(data, str):
+            data = str(data)
+        
         messages = [
             {"role": "system", "content": instruction},
             {"role": "user", "content": "Data: " + data}
@@ -230,7 +272,6 @@ class AttentionModel:
 
     def train(self, epochs=10, learning_rate=1e-4, classifier_kwargs=None):
         """Train the classifier model on the prepared datasets."""
-        # Determine which training method to use based on classifier type
         if isinstance(self.classifier, SimpleCNNClassifier):
             return self._train_cnn(epochs, learning_rate)
         elif isinstance(self.classifier, RandomForestClassifier):
@@ -303,7 +344,6 @@ class AttentionModel:
         device = torch.device(self.device)
         print(f"Training {model_name} classifier...")
         
-        # Collect all training data
         all_train_heatmaps = []
         all_train_labels = []
         
@@ -311,14 +351,11 @@ class AttentionModel:
             all_train_heatmaps.append(heatmaps)
             all_train_labels.append(labels)
         
-        # Concatenate all batches
         train_heatmaps = torch.cat(all_train_heatmaps, dim=0)
         train_labels = torch.cat(all_train_labels, dim=0)
         
-        # Train the model
         self.classifier.fit(train_heatmaps, train_labels)
         
-        # Evaluate on training set
         train_outputs = self.classifier(train_heatmaps)
         train_preds = torch.argmax(train_outputs, dim=1).cpu().numpy()
         train_labels = train_labels.numpy()
@@ -329,11 +366,9 @@ class AttentionModel:
         print(f"Training Accuracy: {train_acc:.4f}")
         print(f"Training F1: {train_f1:.4f}")
         
-        # Evaluate on validation set
         val_metrics = self.evaluate()
         print(f"Validation Metrics: {val_metrics}")
         
-        # Save the model
         torch.save(self.classifier.state_dict(), self.classifier_path)
         
         return val_metrics
@@ -348,27 +383,26 @@ class AttentionModel:
         all_preds = []
         all_labels = []
         all_times = []
+        all_probs = []
         
         with torch.no_grad():
             for heatmaps, labels in self.val_dataloader:
-                # Process each sample in the batch individually to measure per-prompt time
                 for i in range(len(heatmaps)):
                     single_heatmap = heatmaps[i:i+1].to(device)
                     
-                    # Measure classification time
                     start_time = time.time()
                     outputs = self.classifier(single_heatmap)
                     end_time = time.time()
                     
-                    # Calculate time in milliseconds
                     inference_time_ms = (end_time - start_time) * 1000
                     all_times.append(inference_time_ms)
                     
-                    pred = torch.argmax(outputs, dim=1).cpu().numpy()[0]
+                    probs = F.softmax(outputs, dim=1).cpu().numpy()[0]
+                    pred = np.argmax(probs)
+                    all_probs.append(probs[1])  # Probability of positive class
                     all_preds.append(pred)
                     all_labels.append(labels[i].item())
         
-        # Calculate average time per prompt
         avg_time_per_prompt_ms = sum(all_times) / len(all_times)
         
         return {
@@ -376,6 +410,7 @@ class AttentionModel:
             'precision': precision_score(all_labels, all_preds),
             'recall': recall_score(all_labels, all_preds),
             'f1': f1_score(all_labels, all_preds),
+            'auc_roc': roc_auc_score(all_labels, all_probs),
             'avg_time_per_prompt_ms': avg_time_per_prompt_ms,
             'min_time_per_prompt_ms': min(all_times),
             'max_time_per_prompt_ms': max(all_times)
@@ -391,7 +426,6 @@ class AttentionModel:
         with torch.no_grad():
             heatmap_tensor = torch.FloatTensor(heatmap).unsqueeze(0).to(device)
             
-            # Measure classification time
             start_time = time.time()
             output = self.classifier(heatmap_tensor)
             end_time = time.time()
@@ -399,7 +433,6 @@ class AttentionModel:
             pred = torch.argmax(output, dim=1).item()
             prob = F.softmax(output, dim=1)[0][pred].item()
             
-            # Calculate time in milliseconds
             inference_time_ms = (end_time - start_time) * 1000
         
         return pred, prob, inference_time_ms

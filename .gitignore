@@ -3,3 +3,5 @@ tmp_trainer/
 venv/
 saved_models/
 checkpoints/
+.DS_Store
+wandb/

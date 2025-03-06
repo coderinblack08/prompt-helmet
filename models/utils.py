@@ -6,7 +6,7 @@ from functools import lru_cache
 def pull_datasets():
     user_prompts = pd.read_csv("./datasets/user_prompts.csv")
     system_prompts = pd.read_csv("./datasets/system_prompts.csv")
-
+    
     return user_prompts, system_prompts
 
 
@@ -18,7 +18,9 @@ def get_all_user_prompts(system_prompt_id):
 def get_training_and_validation_splits(split_ratio=0.8, total_size=None):
     _, system_prompts = pull_datasets()
     
-    if total_size is not None:
+    if total_size is None:
+        system_prompts = system_prompts.sample(frac=1, random_state=42)
+    else:
         system_prompts = system_prompts.sample(n=min(total_size, len(system_prompts)), random_state=42)
     
     train_system_prompts = system_prompts.sample(frac=split_ratio, random_state=42)
