@@ -29,18 +29,18 @@ Attention model:
 
 - Try different classifier models:
 
-  - [ ] Gradient Boosting
-  - [ ] Random Forest
-  - [ ] CNN
+  - [x] Gradient Boosting
+  - [x] Random Forest
+  - [x] CNN
 
 - Try different base LLMs:
 
-  - [ ] Qwen (1.5B)
+  - [x] Qwen (1.5B)
   - [ ] Gemma (2B)
   - [ ] Mistral (7B)
   - [ ] Llama (8B)
 
-- [ ] Measure the time per inference (ms)
+- [x] Measure the time per inference (ms)
 
 Embedding + Attention model:
 
