@@ -66,7 +66,7 @@ class AttentionModel:
             attn_implementation="eager",
             torch_dtype=torch.float16,
             device_map="auto"
-        ).to(device)
+        )
         self.classifier_class = classifier_class
         self.classifier = None
 

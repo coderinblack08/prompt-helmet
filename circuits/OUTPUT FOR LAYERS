@@ -1,0 +1,250 @@
+===== Analyzing Secret Extraction Circuit =====
+Processing 10 examples...
+  0%|                                                              | 0/10 [00:00<?, ?it/s]huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+        - Avoid using `tokenizers` before the fork if possible
+        - Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+100%|█████████████████████████████████████████████████████| 10/10 [00:15<00:00,  1.51s/it]
+Average clean secret token probability: 0.000000
+Average corrupted secret token probability: 0.999881
+Secret extraction success rate increase: 0.999881
+Important head found: Layer 0, Head 1, Distraction value: -0.5120
+Important head found: Layer 0, Head 0, Distraction value: -0.5084
+Important head found: Layer 1, Head 2, Distraction value: -0.4254
+Important head found: Layer 1, Head 6, Distraction value: -0.3910
+Important head found: Layer 0, Head 7, Distraction value: -0.3452
+Important head found: Layer 0, Head 4, Distraction value: -0.3354
+Important head found: Layer 5, Head 5, Distraction value: -0.3324
+Important head found: Layer 1, Head 8, Distraction value: -0.2794
+Important head found: Layer 0, Head 2, Distraction value: -0.2707
+Important head found: Layer 3, Head 4, Distraction value: -0.2286
+Important head found: Layer 3, Head 11, Distraction value: -0.1979
+Important head found: Layer 1, Head 10, Distraction value: -0.1962
+Important head found: Layer 1, Head 11, Distraction value: -0.1944
+Important head found: Layer 7, Head 11, Distraction value: -0.1925
+Important head found: Layer 7, Head 9, Distraction value: -0.1838
+Important head found: Layer 5, Head 0, Distraction value: -0.1822
+Important head found: Layer 7, Head 4, Distraction value: -0.1815
+Important head found: Layer 1, Head 5, Distraction value: -0.1781
+Important head found: Layer 5, Head 3, Distraction value: -0.1662
+Important head found: Layer 5, Head 2, Distraction value: -0.1641
+
+Using extreme pattern replacement for measuring head importance...
+Layer 0, Head 1 - Replacing attention pattern:
+  Original max attention: 0.9360, to token: 91
+  Original max attention was to injection token
+  System token attention sum: 0.0126
+  Injection token attention sum: 0.9389
+Example 0 - Layer 0, Head 1: corrupted=0.999675, patched=0.999676, impact=0.000001
+Example 1 - Layer 0, Head 1: corrupted=0.999979, patched=0.999978, impact=-0.000000
+Example 2 - Layer 0, Head 1: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 0, Head 1 changed probability by 0.000000 (not significant)
+Layer 0, Head 0 - Replacing attention pattern:
+  Original max attention: 0.1196, to token: 87
+  Original max attention was to injection token
+  System token attention sum: 0.2948
+  Injection token attention sum: 0.6624
+Example 0 - Layer 0, Head 0: corrupted=0.999675, patched=0.999676, impact=0.000001
+Example 1 - Layer 0, Head 0: corrupted=0.999979, patched=0.999979, impact=0.000000
+Example 2 - Layer 0, Head 0: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 0, Head 0 changed probability by 0.000000 (not significant)
+Layer 1, Head 2 - Replacing attention pattern:
+  Original max attention: 0.0967, to token: 78
+  Original max attention was to injection token
+  System token attention sum: 0.1075
+  Injection token attention sum: 0.8312
+Example 0 - Layer 1, Head 2: corrupted=0.999675, patched=0.999672, impact=-0.000003
+Example 1 - Layer 1, Head 2: corrupted=0.999979, patched=0.999979, impact=0.000000
+Example 2 - Layer 1, Head 2: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 1, Head 2 changed probability by -0.000001 (not significant)
+Layer 1, Head 6 - Replacing attention pattern:
+  Original max attention: 0.1892, to token: 78
+  Original max attention was to injection token
+  System token attention sum: 0.2248
+  Injection token attention sum: 0.7188
+Example 0 - Layer 1, Head 6: corrupted=0.999675, patched=0.999663, impact=-0.000012
+Example 1 - Layer 1, Head 6: corrupted=0.999979, patched=0.999977, impact=-0.000001
+Example 2 - Layer 1, Head 6: corrupted=0.999982, patched=0.999981, impact=-0.000001
+Layer 1, Head 6 changed probability by -0.000005 (not significant)
+Layer 0, Head 7 - Replacing attention pattern:
+  Original max attention: 0.1235, to token: 102
+  Original max attention was to injection token
+  System token attention sum: 0.2679
+  Injection token attention sum: 0.5981
+Example 0 - Layer 0, Head 7: corrupted=0.999675, patched=0.999677, impact=0.000002
+Example 1 - Layer 0, Head 7: corrupted=0.999979, patched=0.999979, impact=0.000001
+Example 2 - Layer 0, Head 7: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 0, Head 7 changed probability by 0.000001 (not significant)
+Layer 0, Head 4 - Replacing attention pattern:
+  Original max attention: 0.3691, to token: 78
+  Original max attention was to injection token
+  System token attention sum: 0.1223
+  Injection token attention sum: 0.7914
+Example 0 - Layer 0, Head 4: corrupted=0.999675, patched=0.999670, impact=-0.000005
+Example 1 - Layer 0, Head 4: corrupted=0.999979, patched=0.999978, impact=-0.000001
+Example 2 - Layer 0, Head 4: corrupted=0.999982, patched=0.999982, impact=-0.000000
+Layer 0, Head 4 changed probability by -0.000002 (not significant)
+Layer 5, Head 5 - Replacing attention pattern:
+  Original max attention: 0.1500, to token: 0
+  System token attention sum: 0.1630
+  Injection token attention sum: 0.5709
+Example 0 - Layer 5, Head 5: corrupted=0.999675, patched=0.999486, impact=-0.000189
+Example 1 - Layer 5, Head 5: corrupted=0.999979, patched=0.999977, impact=-0.000002
+Example 2 - Layer 5, Head 5: corrupted=0.999982, patched=0.999979, impact=-0.000003
+Layer 5, Head 5 changed probability by -0.000065 (not significant)
+Layer 1, Head 8 - Replacing attention pattern:
+  Original max attention: 0.0872, to token: 45
+  System token attention sum: 0.2814
+  Injection token attention sum: 0.5179
+Example 0 - Layer 1, Head 8: corrupted=0.999675, patched=0.999665, impact=-0.000010
+Example 1 - Layer 1, Head 8: corrupted=0.999979, patched=0.999978, impact=-0.000000
+Example 2 - Layer 1, Head 8: corrupted=0.999982, patched=0.999982, impact=-0.000000
+Layer 1, Head 8 changed probability by -0.000004 (not significant)
+Layer 0, Head 2 - Replacing attention pattern:
+  Original max attention: 0.1050, to token: 78
+  Original max attention was to injection token
+  System token attention sum: 0.2432
+  Injection token attention sum: 0.6746
+Example 0 - Layer 0, Head 2: corrupted=0.999675, patched=0.999682, impact=0.000007
+Example 1 - Layer 0, Head 2: corrupted=0.999979, patched=0.999979, impact=0.000001
+Example 2 - Layer 0, Head 2: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 0, Head 2 changed probability by 0.000003 (not significant)
+Layer 3, Head 4 - Replacing attention pattern:
+  Original max attention: 0.6037, to token: 0
+  System token attention sum: 0.0875
+  Injection token attention sum: 0.2465
+Example 0 - Layer 3, Head 4: corrupted=0.999675, patched=0.999698, impact=0.000022
+Example 1 - Layer 3, Head 4: corrupted=0.999979, patched=0.999979, impact=0.000001
+Example 2 - Layer 3, Head 4: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 3, Head 4 changed probability by 0.000008 (not significant)
+Layer 3, Head 11 - Replacing attention pattern:
+  Original max attention: 0.2024, to token: 7
+  Original max attention was to system token
+  System token attention sum: 0.3473
+  Injection token attention sum: 0.4448
+Example 0 - Layer 3, Head 11: corrupted=0.999675, patched=0.999655, impact=-0.000021
+Example 1 - Layer 3, Head 11: corrupted=0.999979, patched=0.999977, impact=-0.000001
+Example 2 - Layer 3, Head 11: corrupted=0.999982, patched=0.999981, impact=-0.000001
+Layer 3, Head 11 changed probability by -0.000008 (not significant)
+Layer 1, Head 10 - Replacing attention pattern:
+  Original max attention: 0.4261, to token: 99
+  Original max attention was to injection token
+  System token attention sum: 0.0298
+  Injection token attention sum: 0.9557
+Example 0 - Layer 1, Head 10: corrupted=0.999675, patched=0.999660, impact=-0.000015
+Example 1 - Layer 1, Head 10: corrupted=0.999979, patched=0.999978, impact=-0.000000
+Example 2 - Layer 1, Head 10: corrupted=0.999982, patched=0.999982, impact=-0.000000
+Layer 1, Head 10 changed probability by -0.000005 (not significant)
+Layer 1, Head 11 - Replacing attention pattern:
+  Original max attention: 0.1462, to token: 97
+  Original max attention was to injection token
+  System token attention sum: 0.0560
+  Injection token attention sum: 0.8994
+Example 0 - Layer 1, Head 11: corrupted=0.999675, patched=0.999687, impact=0.000012
+Example 1 - Layer 1, Head 11: corrupted=0.999979, patched=0.999979, impact=0.000001
+Example 2 - Layer 1, Head 11: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 1, Head 11 changed probability by 0.000004 (not significant)
+Layer 7, Head 11 - Replacing attention pattern:
+  Original max attention: 0.1031, to token: 0
+  System token attention sum: 0.1626
+  Injection token attention sum: 0.5408
+Example 0 - Layer 7, Head 11: corrupted=0.999675, patched=0.999675, impact=0.000000
+Example 1 - Layer 7, Head 11: corrupted=0.999979, patched=0.999980, impact=0.000001
+Example 2 - Layer 7, Head 11: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 7, Head 11 changed probability by 0.000001 (not significant)
+Layer 7, Head 9 - Replacing attention pattern:
+  Original max attention: 0.1317, to token: 0
+  System token attention sum: 0.0274
+  Injection token attention sum: 0.8063
+Example 0 - Layer 7, Head 9: corrupted=0.999675, patched=0.999665, impact=-0.000010
+Example 1 - Layer 7, Head 9: corrupted=0.999979, patched=0.999981, impact=0.000002
+Example 2 - Layer 7, Head 9: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 7, Head 9 changed probability by -0.000003 (not significant)
+Layer 5, Head 0 - Replacing attention pattern:
+  Original max attention: 0.1506, to token: 0
+  System token attention sum: 0.1774
+  Injection token attention sum: 0.5712
+Example 0 - Layer 5, Head 0: corrupted=0.999675, patched=0.999661, impact=-0.000014
+Example 1 - Layer 5, Head 0: corrupted=0.999979, patched=0.999977, impact=-0.000001
+Example 2 - Layer 5, Head 0: corrupted=0.999982, patched=0.999982, impact=-0.000000
+Layer 5, Head 0 changed probability by -0.000005 (not significant)
+Layer 7, Head 4 - Replacing attention pattern:
+  Original max attention: 0.1493, to token: 45
+  System token attention sum: 0.2492
+  Injection token attention sum: 0.4741
+Example 0 - Layer 7, Head 4: corrupted=0.999675, patched=0.999633, impact=-0.000042
+Example 1 - Layer 7, Head 4: corrupted=0.999979, patched=0.999977, impact=-0.000001
+Example 2 - Layer 7, Head 4: corrupted=0.999982, patched=0.999980, impact=-0.000002
+Layer 7, Head 4 changed probability by -0.000015 (not significant)
+Layer 1, Head 5 - Replacing attention pattern:
+  Original max attention: 0.0408, to token: 102
+  Original max attention was to injection token
+  System token attention sum: 0.3496
+  Injection token attention sum: 0.4948
+Example 0 - Layer 1, Head 5: corrupted=0.999675, patched=0.999678, impact=0.000002
+Example 1 - Layer 1, Head 5: corrupted=0.999979, patched=0.999979, impact=0.000000
+Example 2 - Layer 1, Head 5: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 1, Head 5 changed probability by 0.000001 (not significant)
+Layer 5, Head 3 - Replacing attention pattern:
+  Original max attention: 0.3893, to token: 0
+  System token attention sum: 0.1537
+  Injection token attention sum: 0.3667
+Example 0 - Layer 5, Head 3: corrupted=0.999675, patched=0.999679, impact=0.000004
+Example 1 - Layer 5, Head 3: corrupted=0.999979, patched=0.999979, impact=0.000001
+Example 2 - Layer 5, Head 3: corrupted=0.999982, patched=0.999982, impact=0.000000
+Layer 5, Head 3 changed probability by 0.000002 (not significant)
+Layer 5, Head 2 - Replacing attention pattern:
+  Original max attention: 0.3867, to token: 0
+  System token attention sum: 0.0616
+  Injection token attention sum: 0.4924
+Example 0 - Layer 5, Head 2: corrupted=0.999675, patched=0.999674, impact=-0.000001
+Example 1 - Layer 5, Head 2: corrupted=0.999979, patched=0.999978, impact=-0.000000
+Example 2 - Layer 5, Head 2: corrupted=0.999982, patched=0.999982, impact=-0.000000
+Layer 5, Head 2 changed probability by -0.000001 (not significant)
+
+Trying pattern-based full layer intervention...
+Example 0 - Layer 0 (all heads): corrupted=0.999675, patched=0.153715, impact=-0.845960
+Example 1 - Layer 0 (all heads): corrupted=0.999979, patched=0.380056, impact=-0.619922
+Example 2 - Layer 0 (all heads): corrupted=0.999982, patched=0.073238, impact=-0.926744
+Layer 0 is a critical layer! Impact: -0.797542
+Example 0 - Layer 1 (all heads): corrupted=0.999675, patched=0.999563, impact=-0.000112
+Example 1 - Layer 1 (all heads): corrupted=0.999979, patched=0.999976, impact=-0.000003
+Example 2 - Layer 1 (all heads): corrupted=0.999982, patched=0.999979, impact=-0.000003
+Layer 1 impact: -0.000039
+Example 0 - Layer 2 (all heads): corrupted=0.999675, patched=0.999505, impact=-0.000170
+Example 1 - Layer 2 (all heads): corrupted=0.999979, patched=0.999975, impact=-0.000004
+Example 2 - Layer 2 (all heads): corrupted=0.999982, patched=0.999978, impact=-0.000004
+Layer 2 impact: -0.000059
+Example 0 - Layer 3 (all heads): corrupted=0.999675, patched=0.999603, impact=-0.000072
+Example 1 - Layer 3 (all heads): corrupted=0.999979, patched=0.999975, impact=-0.000004
+Example 2 - Layer 3 (all heads): corrupted=0.999982, patched=0.999979, impact=-0.000003
+Layer 3 impact: -0.000026
+Example 0 - Layer 4 (all heads): corrupted=0.999675, patched=0.999658, impact=-0.000017
+Example 1 - Layer 4 (all heads): corrupted=0.999979, patched=0.999981, impact=0.000003
+Example 2 - Layer 4 (all heads): corrupted=0.999982, patched=0.999986, impact=0.000004
+Layer 4 impact: -0.000004
+Example 0 - Layer 5 (all heads): corrupted=0.999675, patched=0.999533, impact=-0.000143
+Example 1 - Layer 5 (all heads): corrupted=0.999979, patched=0.999976, impact=-0.000003
+Example 2 - Layer 5 (all heads): corrupted=0.999982, patched=0.999979, impact=-0.000003
+Layer 5 impact: -0.000049
+Example 0 - Layer 6 (all heads): corrupted=0.999675, patched=0.999550, impact=-0.000125
+Example 1 - Layer 6 (all heads): corrupted=0.999979, patched=0.999969, impact=-0.000010
+Example 2 - Layer 6 (all heads): corrupted=0.999982, patched=0.999974, impact=-0.000008
+Layer 6 impact: -0.000048
+Example 0 - Layer 7 (all heads): corrupted=0.999675, patched=0.999780, impact=0.000105
+Example 1 - Layer 7 (all heads): corrupted=0.999979, patched=0.999986, impact=0.000007
+Example 2 - Layer 7 (all heads): corrupted=0.999982, patched=0.999986, impact=0.000004
+Layer 7 impact: 0.000039
+Layer impact analysis saved to layer_impact_analysis.png
+Layer 0 all heads attention visualization saved to layer0_all_heads_attention_change.png
+Visualizing the discovered secret extraction circuit...
+Secret extraction circuit visualization saved to secret_extraction_circuit_heatmap.png
+Ablation impact scores visualization saved to ablation_impact_scores.png
+
+Visualizing attention patterns for the top circuit head (Layer 0, Head 1)...
+Layer 0 all heads attention visualization saved to layer0_all_heads_attention_change.png
+
+Important heads found:
+[(0, 1), (0, 0), (1, 2), (1, 6), (0, 7)]
+
+Done!
