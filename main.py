@@ -28,9 +28,10 @@ def run_attention_model(model_name, total_size, classifier_class, train):
 
 
 def main():
-    # print(run_embedding_model(model_name="all-MiniLM-L6-v2", total_size=None, train=False))
+    print(run_embedding_model(model_name="all-MiniLM-L6-v2", total_size=None, train=False))
     print(run_embedding_model(model_name="all-mpnet-base-v2", total_size=None, train=False))
-    # print(run_attention_model(classifier_class=SimpleCNNClassifier(), model_name="Qwen/Qwen2.5-1.5B-Instruct", train=True, total_size=100))
+
+    print(run_attention_model(classifier_class=SimpleCNNClassifier(), model_name="Qwen/Qwen2.5-1.5B-Instruct", train=True, total_size=100))
 
 
 if __name__ == "__main__":
